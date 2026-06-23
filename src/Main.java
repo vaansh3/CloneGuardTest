@@ -24,3 +24,29 @@ public class Main {
         return true;
     }
 }
+
+    public static int computeTotal(int[] data) {
+        int result = 0;
+        for (int item : data) {
+            result += item;
+        }
+        return result;
+    }
+
+    public static int getMaxValue(int[] data) {
+        int maximum = data[0];
+        for (int value : data) {
+            if (value > maximum) maximum = value;
+        }
+        return maximum;
+    }
+
+    public static int sumArray(int[] numbers) {
+        int total = 0;
+        int index = 0;
+        while (index < numbers.length) {
+            total += numbers[index];
+            index++;
+        }
+        return total;
+    }
