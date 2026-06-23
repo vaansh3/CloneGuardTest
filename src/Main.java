@@ -1,5 +1,7 @@
 public class Main {
 
+    // ── BASE FUNCTIONS ────────────────────────────────────────────────────────
+
     public static int calculateSum(int[] numbers) {
         int totalSum = 0;
         for (int number : numbers) {
@@ -24,61 +26,60 @@ public class Main {
         return true;
     }
 
-    // Large snippet — Type 3 near-miss clone of calculateSum
-    public static double computeAverage(int[] numbers) {
-        double total = 0;
-        int count = 0;
+    // ── TYPE 1: EXACT CLONE (Layer 1 — identical body) ───────────────────────
+
+    public static int sumNumbers(int[] numbers) {
+        int totalSum = 0;
+        for (int number : numbers) {
+            totalSum += number;
+        }
+        return totalSum;
+    }
+
+    // ── TYPE 2: RENAMED CLONE (Layer 1 — same structure, different names) ────
+
+    public static int getMaxValue(int[] data) {
+        int maximum = data[0];
+        for (int value : data) {
+            if (value > maximum) maximum = value;
+        }
+        return maximum;
+    }
+
+    // ── TYPE 3: NEAR-MISS CLONE (Layer 2 — same structure, minor additions) ──
+
+    public static int computeTotal(int[] numbers) {
+        if (numbers == null || numbers.length == 0) return 0;
+        int totalSum = 0;
         for (int i = 0; i < numbers.length; i++) {
-            total = total + numbers[i];
-            count++;
+            totalSum += numbers[i];
         }
-        if (count == 0) return 0;
-        double average = total / count;
-        return average;
+        return totalSum;
     }
 
-    // Large snippet — Type 3 near-miss clone of computeAverage
-    public static double calculateMean(int[] data) {
-        double sum = 0;
-        int length = 0;
+    public static int addAllElements(int[] data) {
+        if (data == null || data.length == 0) return 0;
+        int result = 0;
         for (int i = 0; i < data.length; i++) {
-            sum = sum + data[i];
-            length++;
+            result += data[i];
         }
-        if (length == 0) return 0;
-        double mean = sum / length;
-        return mean;
+        return result;
     }
 
-    // Large snippet — Type 4 semantic clone of findMax
-    public static int findMinValue(int[] numbers) {
-        if (numbers == null || numbers.length == 0) {
-            throw new IllegalArgumentException("Array must not be empty");
+    // ── TYPE 4: SEMANTIC CLONE (Layer 2 — different impl, same goal) ─────────
+
+    public static int iterativeSum(int[] numbers) {
+        int total = 0;
+        int index = 0;
+        while (index < numbers.length) {
+            total = total + numbers[index];
+            index++;
         }
-        int smallest = numbers[0];
-        for (int index = 1; index < numbers.length; index++) {
-            if (numbers[index] < smallest) {
-                smallest = numbers[index];
-            }
-        }
-        return smallest;
+        return total;
     }
 
-    // Large snippet — Type 4 semantic clone of findMinValue
-    public static int getLowestNumber(int[] data) {
-        if (data == null || data.length == 0) {
-            throw new IllegalArgumentException("Input array cannot be empty");
-        }
-        int minimum = data[0];
-        for (int idx = 1; idx < data.length; idx++) {
-            if (data[idx] < minimum) {
-                minimum = data[idx];
-            }
-        }
-        return minimum;
+    public static int recursiveSum(int[] numbers, int index) {
+        if (index >= numbers.length) return 0;
+        return numbers[index] + recursiveSum(numbers, index + 1);
     }
 }
-// test
-// retest fixed server
-// retest operation check
-// retest operation check
