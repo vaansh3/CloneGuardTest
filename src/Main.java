@@ -39,4 +39,13 @@ public class Main {
         }
         return maximum;
     }
+
+    // Type 1 clone of calculateSum
+    public static int sumNumbers(int[] numbers) {
+        int totalSum = 0;
+        for (int number : numbers) {
+            totalSum += number;
+        }
+        return totalSum;
+    }
 }
