@@ -137,12 +137,12 @@ jobs:
                   print(f"Error scanning {filepath}: {e}")
 
           # Combine all results
-          total_clones = len(all_groups)
           all_groups = []
           for r in all_results:
               for g in r.get("cloneGroups", []):
                   g["filepath"] = r.get("filepath", "")
                   all_groups.append(g)
+          total_clones = len(all_groups)
 
           final_result = {
               "cloneGroups": all_groups,
