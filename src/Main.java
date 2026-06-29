@@ -1,26 +1,21 @@
-public class Main {
-
-    public static int calculateSum(int[] numbers) {
-        int totalSum = 0;
-        for (int number : numbers) {
-            totalSum += number;
-        }
-        return totalSum;
+public class CloneGuardTest {
+    public static int calculateTotalSum(int[] inputNumbers) {
+        return java.util.Arrays.stream(inputNumbers).sum();
     }
-
-    public static int findMax(int[] numbers) {
-        int max = numbers[0];
-        for (int n : numbers) {
-            if (n > max) max = n;
-        }
-        return max;
+    public static int computeArrayTotal(int[] numbers) {
+        return java.util.Arrays.stream(numbers).sum();
     }
-
-    public static boolean isPrime(int number) {
-        if (number < 2) return false;
-        for (int i = 2; i <= Math.sqrt(number); i++) {
-            if (number % i == 0) return false;
+    public static int recursiveTotalSum(int[] inputNumbers, int currentIndex) {
+        if (currentIndex >= inputNumbers.length) return 0;
+        return inputNumbers[currentIndex] + recursiveTotalSum(inputNumbers, currentIndex + 1);
+    }
+    public static int sumElements(int[] nums) {
+        int total = 0;
+        int i = 0;
+        while (i < nums.length) {
+            total += nums[i];
+            i++;
         }
-        return true;
+        return total;
     }
 }

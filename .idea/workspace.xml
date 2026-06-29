@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="dcea6b18-8aae-41f5-ac0f-f925c0b88505" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/src/CloneGuard-Test.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.1476240826786912" />
+      <entry key="MS500" value="1.6820752549671913" />
+      <entry key="S2" value="1.9427856927507325" />
+      <entry key="S5" value="2.2210620516040063" />
+      <entry key="S10" value="2.4895792824579344" />
+      <entry key="S30" value="2.791831061930873" />
+      <entry key="S60" value="2.890230125606871" />
+      <entry key="M2" value="2.9436125779536533" />
+      <entry key="M5" value="2.97707351504211" />
+      <entry key="M10" value="2.988473904939033" />
+      <entry key="M15" value="2.9923018994112134" />
+      <entry key="M30" value="2.996143913522355" />
+      <entry key="H1" value="2.9980701944121497" />
+      <entry key="H2" value="2.9990346562052372" />
+      <entry key="H4" value="2.999517217800669" />
+      <entry key="D1" value="2.9999195209760026" />
+      <entry key="W1" value="2.99998850262123" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.1476350989841991" />
+      <entry key="MS500" value="0.7840298468850203" />
+      <entry key="S2" value="1.507236141544248" />
+      <entry key="S5" value="2.0150363865569187" />
+      <entry key="S10" value="2.379828549501661" />
+      <entry key="S30" value="2.75351539874604" />
+      <entry key="S60" value="2.870836252375816" />
+      <entry key="M2" value="2.9338549216142837" />
+      <entry key="M5" value="2.973155649045662" />
+      <entry key="M10" value="2.986512484946554" />
+      <entry key="M15" value="2.990993731935328" />
+      <entry key="M30" value="2.99548955233822" />
+      <entry key="H1" value="2.9977429443885315" />
+      <entry key="H2" value="2.9988710138267747" />
+      <entry key="H4" value="2.9994353922686776" />
+      <entry key="D1" value="2.9999058827840837" />
+      <entry key="W1" value="2.999986554293324" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3FjJR423GtAiQ7vIYW5Plgy2D5f" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature/scenario3-recording&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/vaansh/Desktop/CloneGuard-Test&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-37e91769500f-intellij.indexing.shared.core-IU-261.25134.95" />
+        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-IU-261.25134.95" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="dcea6b18-8aae-41f5-ac0f-f925c0b88505" name="Changes" comment="" />
+      <created>1782582533939</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1782582533939</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>
