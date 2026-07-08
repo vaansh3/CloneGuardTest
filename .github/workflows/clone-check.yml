@@ -248,63 +248,77 @@ jobs:
                   g["suggestionFallbackReason"] = "Could not locate one or both methods' line ranges."
                   continue
 
-              covered = diff_ranges.get(filepath, [])
-              canon_in_diff = in_diff(covered, canon_loc[0], canon_loc[1])
-              dup_in_diff = in_diff(covered, dup_loc[0], dup_loc[1])
+              # ONE-CLICK FIX: originally posted 3 separate comments (canonical
+              # suggestion, duplicate suggestion, a plain-text helper note the
+              # person had to paste in by hand) -- found live that this is a
+              # real usability gap, not just inconvenience: it's easy to
+              # apply 2 of 3 and end up with a helper reference to a method
+              # that doesn't exist yet (confirmed directly -- happened twice).
+              # A single GitHub suggestion can replace any CONTIGUOUS line
+              # range with arbitrary new content, so instead of touching each
+              # method separately, select the whole span from whichever
+              # method comes first in the file through whichever comes
+              # second, keep any code in between verbatim, and replace the
+              # entire span with: new canonical body + (untouched between-
+              # code) + new duplicate body + the new helper -- all delivered
+              # as ONE suggestion, ONE click, nothing left to forget.
+              if canon_loc[0] <= dup_loc[0]:
+                  first_name, first_loc, first_new_body = canon_name, canon_loc, suggestion["newCanonicalBody"]
+                  second_name, second_loc, second_new_body = dup_name, dup_loc, suggestion["newDuplicateBody"]
+              else:
+                  first_name, first_loc, first_new_body = dup_name, dup_loc, suggestion["newDuplicateBody"]
+                  second_name, second_loc, second_new_body = canon_name, canon_loc, suggestion["newCanonicalBody"]
 
-              # BOTH sides must delegate to the new helper, or the helper
-              # ends up byte-identical to whichever side is left untouched
-              # -- which the next scan then flags as a brand-new clone
-              # (found live: applying only the duplicate's suggestion
-              # produced a coreCoreXxx suggestion on the very next run).
-              # If canonical predates this PR, we can't safely offer an
-              # inline suggestion for it, so don't offer either half.
-              if not (canon_in_diff and dup_in_diff):
+              span_start, span_end = first_loc[0], second_loc[1]
+              covered = diff_ranges.get(filepath, [])
+
+              # The WHOLE span (not just each method's own lines) must be in
+              # the diff, since we're now proposing to replace everything
+              # from span_start to span_end in one go.
+              if not in_diff(covered, span_start, span_end):
                   g["suggestionStatus"] = "fallback"
                   g["suggestionFallbackReason"] = (
-                      f"Both {canon_name}() and {dup_name}() need to be rewritten together "
-                      f"(so the new helper isn't left identical to whichever side is untouched), "
-                      f"but only one of them is part of this PR's diff. Apply both changes manually."
+                      f"{canon_name}() and {dup_name}() need to be rewritten together, "
+                      f"but the combined span (lines {span_start}-{span_end}) isn't fully "
+                      f"part of this PR's diff. Apply both changes manually."
                   )
                   continue
 
-              def post_suggestion(name, loc, new_body, other_name):
+              try:
+                  with open(filepath, 'r', encoding='utf-8') as f:
+                      file_lines = f.read().splitlines()
+                  # Lines strictly between the two methods, preserved as-is
+                  # (e.g. a third, unrelated method sitting between them).
+                  between_lines = file_lines[first_loc[1]:second_loc[0] - 1]
+                  between_text = ("\n".join(between_lines) + "\n\n") if between_lines else ""
+
+                  replacement = (
+                      f"{first_new_body}\n\n{between_text}{second_new_body}\n\n{suggestion['helperCode']}"
+                  )
+
                   body = (
-                      f"**CloneGuard — Extract Method suggestion** (1 of 2 — also see the "
-                      f"matching suggestion on `{other_name}()`, both must be applied together)\n\n"
-                      f"Delegates to the new shared helper `{suggestion['helperName']}()`.\n\n"
-                      f"```suggestion\n{new_body}\n```"
+                      f"**CloneGuard — Extract Method suggestion**\n\n"
+                      f"`{dup_name}()` shares {suggestion['matchedStatements']} statement(s) with "
+                      f"`{canon_name}()`. One click applies all three changes together: both "
+                      f"methods delegate to the new `{suggestion['helperName']}()`, which is "
+                      f"included in this same suggestion.\n\n"
+                      f"```suggestion\n{replacement}\n```"
                   )
                   comment_body = {
                       "body": body, "commit_id": HEAD_SHA, "path": filepath,
-                      "side": "RIGHT", "line": loc[1],
+                      "side": "RIGHT", "line": span_end,
                   }
-                  if loc[0] != loc[1]:
-                      comment_body["start_line"] = loc[0]
+                  if span_start != span_end:
+                      comment_body["start_line"] = span_start
                       comment_body["start_side"] = "RIGHT"
+
                   gh_request(
                       f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
                       method="POST", body=comment_body
                   )
-
-              try:
-                  post_suggestion(dup_name, dup_loc, suggestion["newDuplicateBody"], canon_name)
-                  post_suggestion(canon_name, canon_loc, suggestion["newCanonicalBody"], dup_name)
-                  # Helper itself only needs to be added once -- append it as
-                  # a third, small comment near the duplicate so it's easy
-                  # to find, since suggestion blocks can't insert code at a
-                  # brand-new location outside the replaced range.
-                  helper_note = {
-                      "body": f"**New helper to add** (paste anywhere in the class, e.g. after applying the suggestions above):\n\n```java\n{suggestion['helperCode']}\n```",
-                      "commit_id": HEAD_SHA, "path": filepath, "side": "RIGHT", "line": dup_loc[1],
-                  }
-                  gh_request(
-                      f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
-                      method="POST", body=helper_note
-                  )
                   g["suggestionStatus"] = "inline"
                   inline_posted += 1
-                  print(f"Posted inline suggestions for {canon_name}() + {dup_name}() + helper")
+                  print(f"Posted single merged suggestion for {canon_name}() + {dup_name}() + helper")
               except urllib.error.HTTPError as e:
                   g["suggestionStatus"] = "fallback"
                   g["suggestionFallbackReason"] = f"GitHub rejected inline placement ({e.code}); shown below instead."
@@ -317,6 +331,8 @@ jobs:
 
           print(f"\nInline suggestions posted: {inline_posted}")
           PYTHON
+
+
 
       # Step 5: Post PR summary comment, embedding any fallback suggestions
       # and referencing inline ones, then fail the check if over threshold.
@@ -373,7 +389,7 @@ jobs:
               if suggestable:
                   body += "\n### Refactor Suggestions\n"
                   if inline_posted:
-                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** on BOTH the canonical and duplicate comments, then paste in the new helper method noted alongside them.\n\n"
+                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** once per suggestion; canonical, duplicate, and the new helper are all applied together in that single click.\n\n"
                   fallback = [g for g in suggestable if g.get("suggestionStatus") == "fallback"]
                   for g in fallback:
                       s = g["suggestion"]
