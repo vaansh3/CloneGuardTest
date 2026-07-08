@@ -32,19 +32,11 @@ public class Main {
         return total;
     }
 
-public int sumPositiveValues(int[] nums) {
-    return coreSumPositiveValues(nums);
-}
-
-private static int coreSumPositiveValues(int[] arr) {
-    return coreCoreSumPositiveValues(arr);
-}
-
-private static int coreCoreSumPositiveValues(int[] arr) {
-    int total = 0;
-    for (int i = 0; i < arr.length; i++) {
-            if (arr[i] > 0) total += arr[i];
+    public int sumPositiveValues(int[] nums) {
+        int result = 0;
+        for (int i = 0; i < nums.length; i++) {
+            if (nums[i] > 0) result += nums[i];
         }
-    return total;
-}
+        return result;
+    }
 }
