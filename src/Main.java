@@ -24,13 +24,9 @@ public class Main {
         return true;
     }
 
-    public int sumPositives(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i] > 0) total += arr[i];
-        }
-        return total;
-    }
+public int sumPositives(int[] arr) {
+    return coreSumPositiveValues(arr);
+}
 
     public int sumPositiveValues(int[] nums) {
         int result = 0;
