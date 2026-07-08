@@ -37,6 +37,10 @@ public int sumPositiveValues(int[] nums) {
 }
 
 private static int coreSumPositiveValues(int[] arr) {
+    return coreCoreSumPositiveValues(arr);
+}
+
+private static int coreCoreSumPositiveValues(int[] arr) {
     int total = 0;
     for (int i = 0; i < arr.length; i++) {
             if (arr[i] > 0) total += arr[i];
