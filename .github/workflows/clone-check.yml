@@ -1,6 +1,8 @@
 # ── CloneGuard GitHub Actions Workflow ───────────────────────────────────────
 # Triggers on every PR open or update.
-# Scans changed Java files for clones and posts a review comment.
+# Scans changed Java files for clones, posts a review comment, and (new)
+# suggests an Extract Method refactor as a clickable "Commit suggestion"
+# wherever the duplicate method's lines are actually part of the PR's diff.
 
 name: CloneGuard — Clone Detection
 
@@ -14,6 +16,9 @@ jobs:
   clone-detection:
     name: Scan for Code Clones
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
 
     steps:
       # Step 1: Checkout the PR code
@@ -32,39 +37,38 @@ jobs:
           cat changed_files.txt
           echo "count=$(wc -l < changed_files.txt)" >> $GITHUB_OUTPUT
 
-      # Step 3: Extract functions from changed files and send to CloneGuard
+      # Step 3: Extract functions (with line ranges) from changed files, send to CloneGuard
       - name: Run CloneGuard scan
         id: scan
         env:
           CLONEGUARD_URL: ${{ secrets.CLONEGUARD_SERVER_URL }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 << 'PYTHON'
-          import os, re, json, urllib.request, urllib.error
+          import os, re, json, urllib.request
 
           CLONEGUARD_URL = os.environ.get("CLONEGUARD_URL", "http://localhost:8765")
-          changed_files_path = "changed_files.txt"
 
-          # Read changed Java files
-          with open(changed_files_path) as f:
+          with open("changed_files.txt") as f:
               changed_files = [line.strip() for line in f if line.strip().endswith(".java")]
 
           if not changed_files:
               print("No Java files changed. Skipping scan.")
               with open("scan_result.json", "w") as f:
                   json.dump({"cloneGroups": [], "totalClones": 0, "skipped": True}, f)
+              with open("function_locations.json", "w") as f:
+                  json.dump({}, f)
               exit(0)
 
           print(f"Scanning {len(changed_files)} Java file(s)...")
 
           def extract_functions_from_file(filepath):
-              """Extract Java methods from a file using regex."""
+              """Extract Java methods + their line ranges from a file using regex."""
               functions = []
               try:
                   with open(filepath, 'r', encoding='utf-8') as f:
                       content = f.read()
-              except:
-                  return functions
+              except Exception:
+                  return functions, ""
 
               pattern = re.compile(
                   r'(?:(?:public|private|protected|static|final|synchronized)\s+)+'
@@ -78,14 +82,12 @@ jobs:
                   if name in ('if', 'for', 'while', 'switch', 'try', 'catch'):
                       continue
 
-                  # Extract the full method body
                   start = match.start()
                   brace_start = content.find('{', match.end() - 1)
                   if brace_start == -1:
                       continue
 
-                  depth = 0
-                  end = brace_start
+                  depth, end = 0, brace_start
                   for i in range(brace_start, len(content)):
                       if content[i] == '{':
                           depth += 1
@@ -97,36 +99,42 @@ jobs:
 
                   method_code = content[start:end].strip()
                   if len(method_code) > 20:
-                      functions.append({"name": name, "code": method_code})
+                      start_line = content[:start].count('\n') + 1
+                      end_line = content[:end - 1].count('\n') + 1
+                      functions.append({
+                          "name": name, "code": method_code,
+                          "start_line": start_line, "end_line": end_line
+                      })
 
-              return functions
+              return functions, content
 
           all_results = []
+          function_locations = {}   # filepath -> {funcname: [start_line, end_line]}
 
           for filepath in changed_files:
               if not os.path.exists(filepath):
                   print(f"File not found: {filepath}")
                   continue
 
-              functions = extract_functions_from_file(filepath)
+              functions, _ = extract_functions_from_file(filepath)
               print(f"{filepath}: found {len(functions)} function(s)")
+              function_locations[filepath] = {
+                  fn["name"]: [fn["start_line"], fn["end_line"]] for fn in functions
+              }
 
               if len(functions) < 2:
                   print(f"Skipping {filepath} — need at least 2 functions")
                   continue
 
-              # Send to CloneGuard /scan endpoint
               payload = json.dumps({
-                  "functions": functions,
+                  "functions": [{"name": fn["name"], "code": fn["code"]} for fn in functions],
                   "filename": os.path.basename(filepath)
               }).encode('utf-8')
 
               try:
                   req = urllib.request.Request(
-                      f"{CLONEGUARD_URL}/scan",
-                      data=payload,
-                      headers={"Content-Type": "application/json"},
-                      method="POST"
+                      f"{CLONEGUARD_URL}/scan", data=payload,
+                      headers={"Content-Type": "application/json"}, method="POST"
                   )
                   with urllib.request.urlopen(req, timeout=60) as resp:
                       result = json.loads(resp.read().decode())
@@ -136,7 +144,6 @@ jobs:
               except Exception as e:
                   print(f"Error scanning {filepath}: {e}")
 
-          # Combine all results
           total_clones = sum(r.get("totalClones", 0) for r in all_results)
           all_groups = []
           for r in all_results:
@@ -144,19 +151,175 @@ jobs:
                   g["filepath"] = r.get("filepath", "")
                   all_groups.append(g)
 
-          final_result = {
-              "cloneGroups": all_groups,
-              "totalClones": total_clones,
-              "filesScanned": len(changed_files)
-          }
-
           with open("scan_result.json", "w") as f:
-              json.dump(final_result, f, indent=2)
+              json.dump({
+                  "cloneGroups": all_groups,
+                  "totalClones": total_clones,
+                  "filesScanned": len(changed_files)
+              }, f, indent=2)
+
+          with open("function_locations.json", "w") as f:
+              json.dump(function_locations, f, indent=2)
 
           print(f"\nTotal clones found: {total_clones}")
           PYTHON
 
-      # Step 4: Post PR review comment with clone report
+      # Step 4: For each clone group with an available Extract Method
+      # suggestion, decide whether it can be posted as a real clickable
+      # GitHub "Commit suggestion" (only possible if the duplicate method's
+      # lines are actually part of this PR's diff) or must fall back to a
+      # plain, non-clickable code block in the summary comment.
+      - name: Post refactor suggestions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 << 'PYTHON'
+          import os, re, json, urllib.request, urllib.error
+
+          GH_TOKEN  = os.environ["GH_TOKEN"]
+          PR_NUMBER = os.environ["PR_NUMBER"]
+          REPO      = os.environ["REPO"]
+          HEAD_SHA  = os.environ["HEAD_SHA"]
+
+          with open("scan_result.json") as f:
+              scan_result = json.load(f)
+          with open("function_locations.json") as f:
+              function_locations = json.load(f)
+
+          groups = scan_result.get("cloneGroups", [])
+          if not groups:
+              with open("scan_result.json", "w") as f:
+                  json.dump(scan_result, f, indent=2)
+              print("No clone groups — nothing to suggest.")
+              exit(0)
+
+          def gh_request(url, method="GET", body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(url, data=data, method=method, headers={
+                  "Authorization": f"Bearer {GH_TOKEN}",
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json",
+              })
+              with urllib.request.urlopen(req) as resp:
+                  return json.loads(resp.read().decode())
+
+          # Fetch this PR's changed files + unified diff patches, so we can
+          # tell whether a given line range is actually part of the diff.
+          # GitHub rejects a review-comment suggestion anchored to a line
+          # that isn't in a diff hunk (422) -- so we check first rather
+          # than firing blind and eating failures.
+          pr_files = gh_request(f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/files?per_page=100")
+
+          def covered_lines(patch_text):
+              """Right-side (current HEAD) line numbers covered by this
+              file's diff hunks, from '@@ -a,b +c,d @@' headers."""
+              covered = []
+              if not patch_text:
+                  return covered
+              for m in re.finditer(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@', patch_text, re.MULTILINE):
+                  new_start = int(m.group(1))
+                  new_len = int(m.group(2)) if m.group(2) else 1
+                  covered.append((new_start, new_start + new_len - 1))
+              return covered
+
+          def in_diff(covered, start_line, end_line):
+              return any(cs <= start_line and end_line <= ce for cs, ce in covered)
+
+          diff_ranges = {pf["filename"]: covered_lines(pf.get("patch")) for pf in pr_files}
+
+          inline_posted = 0
+          for g in groups:
+              suggestion = g.get("suggestion")
+              if not suggestion or not suggestion.get("available"):
+                  g["suggestionStatus"] = "none"
+                  continue
+
+              filepath = g.get("filepath", "")
+              canon_name = g.get("functionA", "")
+              dup_name = g.get("functionB", "")
+              canon_loc = function_locations.get(filepath, {}).get(canon_name)
+              dup_loc = function_locations.get(filepath, {}).get(dup_name)
+
+              if not canon_loc or not dup_loc:
+                  g["suggestionStatus"] = "fallback"
+                  g["suggestionFallbackReason"] = "Could not locate one or both methods' line ranges."
+                  continue
+
+              covered = diff_ranges.get(filepath, [])
+              canon_in_diff = in_diff(covered, canon_loc[0], canon_loc[1])
+              dup_in_diff = in_diff(covered, dup_loc[0], dup_loc[1])
+
+              # BOTH sides must delegate to the new helper, or the helper
+              # ends up byte-identical to whichever side is left untouched
+              # -- which the next scan then flags as a brand-new clone
+              # (found live: applying only the duplicate's suggestion
+              # produced a coreCoreXxx suggestion on the very next run).
+              # If canonical predates this PR, we can't safely offer an
+              # inline suggestion for it, so don't offer either half.
+              if not (canon_in_diff and dup_in_diff):
+                  g["suggestionStatus"] = "fallback"
+                  g["suggestionFallbackReason"] = (
+                      f"Both {canon_name}() and {dup_name}() need to be rewritten together "
+                      f"(so the new helper isn't left identical to whichever side is untouched), "
+                      f"but only one of them is part of this PR's diff. Apply both changes manually."
+                  )
+                  continue
+
+              def post_suggestion(name, loc, new_body, other_name):
+                  body = (
+                      f"**CloneGuard — Extract Method suggestion** (1 of 2 — also see the "
+                      f"matching suggestion on `{other_name}()`, both must be applied together)\n\n"
+                      f"Delegates to the new shared helper `{suggestion['helperName']}()`.\n\n"
+                      f"```suggestion\n{new_body}\n```"
+                  )
+                  comment_body = {
+                      "body": body, "commit_id": HEAD_SHA, "path": filepath,
+                      "side": "RIGHT", "line": loc[1],
+                  }
+                  if loc[0] != loc[1]:
+                      comment_body["start_line"] = loc[0]
+                      comment_body["start_side"] = "RIGHT"
+                  gh_request(
+                      f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
+                      method="POST", body=comment_body
+                  )
+
+              try:
+                  post_suggestion(dup_name, dup_loc, suggestion["newDuplicateBody"], canon_name)
+                  post_suggestion(canon_name, canon_loc, suggestion["newCanonicalBody"], dup_name)
+                  # Helper itself only needs to be added once -- append it as
+                  # a third, small comment near the duplicate so it's easy
+                  # to find, since suggestion blocks can't insert code at a
+                  # brand-new location outside the replaced range.
+                  helper_note = {
+                      "body": f"**New helper to add** (paste anywhere in the class, e.g. after applying the suggestions above):\n\n```java\n{suggestion['helperCode']}\n```",
+                      "commit_id": HEAD_SHA, "path": filepath, "side": "RIGHT", "line": dup_loc[1],
+                  }
+                  gh_request(
+                      f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
+                      method="POST", body=helper_note
+                  )
+                  g["suggestionStatus"] = "inline"
+                  inline_posted += 1
+                  print(f"Posted inline suggestions for {canon_name}() + {dup_name}() + helper")
+              except urllib.error.HTTPError as e:
+                  g["suggestionStatus"] = "fallback"
+                  g["suggestionFallbackReason"] = f"GitHub rejected inline placement ({e.code}); shown below instead."
+                  print(f"Inline suggestion failed for {dup_name}(): {e.code} {e.read().decode()[:200]}")
+
+          scan_result["cloneGroups"] = groups
+          scan_result["inlineSuggestionsPosted"] = inline_posted
+          with open("scan_result.json", "w") as f:
+              json.dump(scan_result, f, indent=2)
+
+          print(f"\nInline suggestions posted: {inline_posted}")
+          PYTHON
+
+      # Step 5: Post PR summary comment, embedding any fallback suggestions
+      # and referencing inline ones, then fail the check if over threshold.
       - name: Post clone report as PR comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -177,18 +340,21 @@ jobs:
           total = result.get("totalClones", 0)
           groups = result.get("cloneGroups", [])
           files_scanned = result.get("filesScanned", 0)
+          inline_posted = result.get("inlineSuggestionsPosted", 0)
 
-          # Build comment body
           if total == 0:
               body = "## ✅ CloneGuard — No Clones Detected\n\n"
               body += f"Scanned {files_scanned} Java file(s). Your code is clean!\n"
           else:
               severity_icon = "🔴" if total > THRESHOLD else "🟡"
               body = f"## {severity_icon} CloneGuard — {total} Clone Group(s) Detected\n\n"
+              body += (
+                  "> ℹ️ **PR Review Mode** — this is a team-level gate that runs on every "
+                  "PR. For real-time feedback while coding, use the CloneGuard IntelliJ plugin.\n\n"
+              )
               body += f"Scanned {files_scanned} Java file(s) changed in this PR.\n\n"
               body += "| # | Clone Type | Function A | Function B | Similarity | Layer | Severity |\n"
               body += "|---|-----------|-----------|-----------|------------|-------|----------|\n"
-
               for i, g in enumerate(groups, 1):
                   body += f"| {i} | {g['cloneType']} | `{g['functionA']}()` | `{g['functionB']}()` | {g['similarity']} | {g['detectionLayer']} | {g['severity']} |\n"
 
@@ -196,31 +362,54 @@ jobs:
               for i, g in enumerate(groups, 1):
                   body += f"**{i}. {g['functionA']}() ↔ {g['functionB']}():** {g['recommendation']}\n\n"
 
+              body += "\n### Detection Method\n"
+              body += (
+                  "**Layer 1** (Types 1–2): exact and normalized Karp-Rabin hashing over "
+                  "whitespace/identifier-normalized code. **Layer 2** (Types 3–4): CodeBERT "
+                  "neural embeddings compared via FAISS cosine similarity.\n"
+              )
+
+              suggestable = [g for g in groups if g.get("suggestion", {}).get("available")]
+              if suggestable:
+                  body += "\n### Refactor Suggestions\n"
+                  if inline_posted:
+                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** on BOTH the canonical and duplicate comments, then paste in the new helper method noted alongside them.\n\n"
+                  fallback = [g for g in suggestable if g.get("suggestionStatus") == "fallback"]
+                  for g in fallback:
+                      s = g["suggestion"]
+                      body += f"<details><summary>📋 {g['functionA']}() ↔ {g['functionB']}() — suggested refactor (copy manually)</summary>\n\n"
+                      body += f"*{g.get('suggestionFallbackReason', '')}*\n\n"
+                      body += f"**{g['functionA']}():**\n```java\n{s['newCanonicalBody']}\n```\n\n"
+                      body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n\n"
+                      body += f"**New helper:**\n```java\n{s['helperCode']}\n```\n</details>\n\n"
+
+              not_extractable = [g for g in groups if g.get("suggestion") and not g["suggestion"].get("available")]
+              if not_extractable:
+                  body += "\n<details><summary>Why some clones have no refactor suggestion</summary>\n\n"
+                  for g in not_extractable:
+                      body += f"- **{g['functionA']}() ↔ {g['functionB']}()**: {g['suggestion'].get('reason', 'n/a')}\n"
+                  body += "\n</details>\n"
+
               if total > THRESHOLD:
-                  body += f"\n---\n⛔ **Merge blocked** — {total} clones exceed the threshold of {THRESHOLD}. "
-                  body += "Please refactor before merging.\n"
+                  body += f"\n---\n⛔ **Merge blocked** — {total} clones exceed the threshold of {THRESHOLD}. Please refactor before merging.\n"
               else:
                   body += f"\n---\n⚠️ Clones detected but below threshold ({total}/{THRESHOLD}). Consider refactoring.\n"
 
           body += "\n*Powered by CloneGuard — AI-Assisted Code Clone Detection*"
 
-          # Post comment via GitHub API
           comment_url = f"https://api.github.com/repos/{REPO}/issues/{PR_NUMBER}/comments"
           payload = json.dumps({"body": body}).encode('utf-8')
           req = urllib.request.Request(
-              comment_url,
-              data=payload,
+              comment_url, data=payload,
               headers={
                   "Authorization": f"Bearer {GH_TOKEN}",
                   "Accept": "application/vnd.github+json",
                   "Content-Type": "application/json"
-              },
-              method="POST"
+              }, method="POST"
           )
           with urllib.request.urlopen(req) as resp:
               print(f"Comment posted: {resp.status}")
 
-          # Set exit code to fail if too many clones
           if total > THRESHOLD:
               print(f"FAILING: {total} clones exceed threshold of {THRESHOLD}")
               exit(1)
