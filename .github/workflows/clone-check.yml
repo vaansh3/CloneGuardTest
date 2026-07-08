@@ -238,56 +238,74 @@ jobs:
                   continue
 
               filepath = g.get("filepath", "")
+              canon_name = g.get("functionA", "")
               dup_name = g.get("functionB", "")
-              loc = function_locations.get(filepath, {}).get(dup_name)
-              if not loc:
+              canon_loc = function_locations.get(filepath, {}).get(canon_name)
+              dup_loc = function_locations.get(filepath, {}).get(dup_name)
+
+              if not canon_loc or not dup_loc:
                   g["suggestionStatus"] = "fallback"
-                  g["suggestionFallbackReason"] = "Could not locate duplicate method's line range."
+                  g["suggestionFallbackReason"] = "Could not locate one or both methods' line ranges."
                   continue
 
-              start_line, end_line = loc
               covered = diff_ranges.get(filepath, [])
+              canon_in_diff = in_diff(covered, canon_loc[0], canon_loc[1])
+              dup_in_diff = in_diff(covered, dup_loc[0], dup_loc[1])
 
-              if not in_diff(covered, start_line, end_line):
+              # BOTH sides must delegate to the new helper, or the helper
+              # ends up byte-identical to whichever side is left untouched
+              # -- which the next scan then flags as a brand-new clone
+              # (found live: applying only the duplicate's suggestion
+              # produced a coreCoreXxx suggestion on the very next run).
+              # If canonical predates this PR, we can't safely offer an
+              # inline suggestion for it, so don't offer either half.
+              if not (canon_in_diff and dup_in_diff):
                   g["suggestionStatus"] = "fallback"
                   g["suggestionFallbackReason"] = (
-                      f"{dup_name}() (lines {start_line}-{end_line}) isn't part of this "
-                      f"PR's diff, so GitHub can't anchor a clickable suggestion there."
+                      f"Both {canon_name}() and {dup_name}() need to be rewritten together "
+                      f"(so the new helper isn't left identical to whichever side is untouched), "
+                      f"but only one of them is part of this PR's diff. Apply both changes manually."
                   )
                   continue
 
-              body = (
-                  f"**CloneGuard — Extract Method suggestion**\n\n"
-                  f"`{dup_name}()` shares {suggestion['matchedStatements']} statement(s) "
-                  f"with `{g['functionA']}()`. Proposed: extract the shared logic into "
-                  f"`{suggestion['helperName']}()` and delegate.\n\n"
-                  f"```suggestion\n{suggestion['newDuplicateBody']}\n\n"
-                  f"{suggestion['helperCode']}\n```"
-              )
-
-              try:
+              def post_suggestion(name, loc, new_body, other_name):
+                  body = (
+                      f"**CloneGuard — Extract Method suggestion** (1 of 2 — also see the "
+                      f"matching suggestion on `{other_name}()`, both must be applied together)\n\n"
+                      f"Delegates to the new shared helper `{suggestion['helperName']}()`.\n\n"
+                      f"```suggestion\n{new_body}\n```"
+                  )
                   comment_body = {
-                      "body": body,
-                      "commit_id": HEAD_SHA,
-                      "path": filepath,
-                      "side": "RIGHT",
-                      "line": end_line,
+                      "body": body, "commit_id": HEAD_SHA, "path": filepath,
+                      "side": "RIGHT", "line": loc[1],
                   }
-                  if start_line != end_line:
-                      comment_body["start_line"] = start_line
+                  if loc[0] != loc[1]:
+                      comment_body["start_line"] = loc[0]
                       comment_body["start_side"] = "RIGHT"
-
                   gh_request(
                       f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
                       method="POST", body=comment_body
                   )
+
+              try:
+                  post_suggestion(dup_name, dup_loc, suggestion["newDuplicateBody"], canon_name)
+                  post_suggestion(canon_name, canon_loc, suggestion["newCanonicalBody"], dup_name)
+                  # Helper itself only needs to be added once -- append it as
+                  # a third, small comment near the duplicate so it's easy
+                  # to find, since suggestion blocks can't insert code at a
+                  # brand-new location outside the replaced range.
+                  helper_note = {
+                      "body": f"**New helper to add** (paste anywhere in the class, e.g. after applying the suggestions above):\n\n```java\n{suggestion['helperCode']}\n```",
+                      "commit_id": HEAD_SHA, "path": filepath, "side": "RIGHT", "line": dup_loc[1],
+                  }
+                  gh_request(
+                      f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
+                      method="POST", body=helper_note
+                  )
                   g["suggestionStatus"] = "inline"
                   inline_posted += 1
-                  print(f"Posted inline suggestion for {dup_name}()")
+                  print(f"Posted inline suggestions for {canon_name}() + {dup_name}() + helper")
               except urllib.error.HTTPError as e:
-                  # GitHub rejected the anchor for a reason our hunk-check
-                  # didn't catch -- fall back rather than losing the
-                  # suggestion entirely.
                   g["suggestionStatus"] = "fallback"
                   g["suggestionFallbackReason"] = f"GitHub rejected inline placement ({e.code}); shown below instead."
                   print(f"Inline suggestion failed for {dup_name}(): {e.code} {e.read().decode()[:200]}")
@@ -355,13 +373,15 @@ jobs:
               if suggestable:
                   body += "\n### Refactor Suggestions\n"
                   if inline_posted:
-                      body += f"✨ {inline_posted} suggestion(s) posted as inline review comments above — click **Commit suggestion** to apply.\n\n"
+                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** on BOTH the canonical and duplicate comments, then paste in the new helper method noted alongside them.\n\n"
                   fallback = [g for g in suggestable if g.get("suggestionStatus") == "fallback"]
                   for g in fallback:
                       s = g["suggestion"]
-                      body += f"<details><summary>📋 {g['functionB']}() — suggested refactor (not part of this PR's diff, copy manually)</summary>\n\n"
+                      body += f"<details><summary>📋 {g['functionA']}() ↔ {g['functionB']}() — suggested refactor (copy manually)</summary>\n\n"
                       body += f"*{g.get('suggestionFallbackReason', '')}*\n\n"
-                      body += f"```java\n{s['newDuplicateBody']}\n\n{s['helperCode']}\n```\n</details>\n\n"
+                      body += f"**{g['functionA']}():**\n```java\n{s['newCanonicalBody']}\n```\n\n"
+                      body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n\n"
+                      body += f"**New helper:**\n```java\n{s['helperCode']}\n```\n</details>\n\n"
 
               not_extractable = [g for g in groups if g.get("suggestion") and not g["suggestion"].get("available")]
               if not_extractable:
