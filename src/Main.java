@@ -23,4 +23,20 @@ public class Main {
         }
         return true;
     }
+
+    public int multiplyAll(int[] arr) {
+        int product = 1;
+        for (int i = 0; i < arr.length; i++) {
+            product *= arr[i];
+        }
+        return product;
+    }
+
+    public int multiplyAllExact(int[] arr) {
+        int product = 1;
+        for (int i = 0; i < arr.length; i++) {
+            product *= arr[i];
+        }
+        return product;
+    }
 }
