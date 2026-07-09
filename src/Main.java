@@ -32,10 +32,7 @@ public class Main {
         return result;
     }
 
-    public int factorialRecursive(int n) {
-        if (n <= 1) {
-            return 1;
-        }
-        return n * factorialRecursive(n - 1);
-    }
+public int factorialRecursive(int n) {
+    return factorialIterative(n);
+}
 }
