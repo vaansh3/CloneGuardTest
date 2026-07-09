@@ -23,4 +23,36 @@ public class Main {
         }
         return true;
     }
+
+    public int multiplyAll(int[] arr) {
+    return coreMultiplyAllExact(arr);
+}
+
+    public int multiplyAllExact(int[] arr) {
+    return coreMultiplyAllExact(arr);
+}
+
+private static int coreMultiplyAllExact(int[] arr) {
+    int product = 1;
+    for (int i = 0; i < arr.length; i++) {
+            product *= arr[i];
+        }
+    return product;
+}
+
+    public int sumPositives(int[] arr) {
+    return coreSumPositiveValues(arr);
+}
+
+    public int sumPositiveValues(int[] nums) {
+    return coreSumPositiveValues(nums);
+}
+
+private static int coreSumPositiveValues(int[] arr) {
+    int total = 0;
+    for (int i = 0; i < arr.length; i++) {
+            if (arr[i] > 0) total += arr[i];
+        }
+    return total;
+}
 }
