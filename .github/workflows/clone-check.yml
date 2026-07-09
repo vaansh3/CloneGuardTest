@@ -164,221 +164,20 @@ jobs:
           print(f"\nTotal clones found: {total_clones}")
           PYTHON
 
-      # Step 4: For each clone group with an available Extract Method
-      # suggestion, decide whether it can be posted as a real clickable
-      # GitHub "Commit suggestion" (only possible if the duplicate method's
-      # lines are actually part of this PR's diff) or must fall back to a
-      # plain, non-clickable code block in the summary comment.
-      - name: Post refactor suggestions
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          python3 << 'PYTHON'
-          import os, re, json, urllib.request, urllib.error
 
-          GH_TOKEN  = os.environ["GH_TOKEN"]
-          PR_NUMBER = os.environ["PR_NUMBER"]
-          REPO      = os.environ["REPO"]
-          HEAD_SHA  = os.environ["HEAD_SHA"]
-
-          with open("scan_result.json") as f:
-              scan_result = json.load(f)
-          with open("function_locations.json") as f:
-              function_locations = json.load(f)
-
-          groups = scan_result.get("cloneGroups", [])
-          if not groups:
-              with open("scan_result.json", "w") as f:
-                  json.dump(scan_result, f, indent=2)
-              print("No clone groups — nothing to suggest.")
-              exit(0)
-
-          def gh_request(url, method="GET", body=None):
-              data = json.dumps(body).encode() if body is not None else None
-              req = urllib.request.Request(url, data=data, method=method, headers={
-                  "Authorization": f"Bearer {GH_TOKEN}",
-                  "Accept": "application/vnd.github+json",
-                  "Content-Type": "application/json",
-              })
-              with urllib.request.urlopen(req) as resp:
-                  return json.loads(resp.read().decode())
-
-          # Fetch this PR's changed files + unified diff patches, so we can
-          # tell whether a given line range is actually part of the diff.
-          # GitHub rejects a review-comment suggestion anchored to a line
-          # that isn't in a diff hunk (422) -- so we check first rather
-          # than firing blind and eating failures.
-          pr_files = gh_request(f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/files?per_page=100")
-
-          def covered_lines(patch_text):
-              """Right-side (current HEAD) line numbers covered by this
-              file's diff hunks, from '@@ -a,b +c,d @@' headers."""
-              covered = []
-              if not patch_text:
-                  return covered
-              for m in re.finditer(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@', patch_text, re.MULTILINE):
-                  new_start = int(m.group(1))
-                  new_len = int(m.group(2)) if m.group(2) else 1
-                  covered.append((new_start, new_start + new_len - 1))
-              return covered
-
-          def in_diff(covered, start_line, end_line):
-              return any(cs <= start_line and end_line <= ce for cs, ce in covered)
-
-          diff_ranges = {pf["filename"]: covered_lines(pf.get("patch")) for pf in pr_files}
-
-          inline_posted = 0
-          for g in groups:
-              suggestion = g.get("suggestion")
-              if not suggestion or not suggestion.get("available"):
-                  g["suggestionStatus"] = "none"
-                  continue
-
-              filepath = g.get("filepath", "")
-              canon_name = g.get("functionA", "")
-              dup_name = g.get("functionB", "")
-              canon_loc = function_locations.get(filepath, {}).get(canon_name)
-              dup_loc = function_locations.get(filepath, {}).get(dup_name)
-
-              if not canon_loc or not dup_loc:
-                  g["suggestionStatus"] = "fallback"
-                  g["suggestionFallbackReason"] = "Could not locate one or both methods' line ranges."
-                  continue
-
-              # DELEGATION is a much simpler case than EXTRACT: only the
-              # duplicate's own body changes (a one-line call to canonical),
-              # canonical is never touched, and no helper method exists to
-              # forget. Only duplicate's own lines need to be in the diff.
-              if suggestion.get("technique") == "delegation":
-                  covered = diff_ranges.get(filepath, [])
-                  if not in_diff(covered, dup_loc[0], dup_loc[1]):
-                      g["suggestionStatus"] = "fallback"
-                      g["suggestionFallbackReason"] = (
-                          f"{dup_name}() (lines {dup_loc[0]}-{dup_loc[1]}) isn't part of "
-                          f"this PR's diff, so GitHub can't anchor a clickable suggestion there."
-                      )
-                      continue
-                  try:
-                      body = (
-                          f"**CloneGuard — Method Delegation suggestion**\n\n"
-                          f"`{dup_name}()` and `{canon_name}()` share the same intent but "
-                          f"different implementations (a Type 4 semantic clone) — no literal "
-                          f"code is shared, so Extract Method doesn't apply here. Since both "
-                          f"have a compatible signature, `{dup_name}()` can simply delegate "
-                          f"to `{canon_name}()` directly.\n\n"
-                          f"```suggestion\n{suggestion['newDuplicateBody']}\n```"
-                      )
-                      comment_body = {
-                          "body": body, "commit_id": HEAD_SHA, "path": filepath,
-                          "side": "RIGHT", "line": dup_loc[1],
-                      }
-                      if dup_loc[0] != dup_loc[1]:
-                          comment_body["start_line"] = dup_loc[0]
-                          comment_body["start_side"] = "RIGHT"
-                      gh_request(
-                          f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
-                          method="POST", body=comment_body
-                      )
-                      g["suggestionStatus"] = "inline"
-                      inline_posted += 1
-                      print(f"Posted delegation suggestion for {dup_name}() -> {canon_name}()")
-                  except urllib.error.HTTPError as e:
-                      g["suggestionStatus"] = "fallback"
-                      g["suggestionFallbackReason"] = f"GitHub rejected inline placement ({e.code}); shown below instead."
-                      print(f"Delegation suggestion failed for {dup_name}(): {e.code} {e.read().decode()[:200]}")
-                  continue
-
-              # ONE-CLICK FIX: originally posted 3 separate comments (canonical
-              # suggestion, duplicate suggestion, a plain-text helper note the
-              # person had to paste in by hand) -- found live that this is a
-              # real usability gap, not just inconvenience: it's easy to
-              # apply 2 of 3 and end up with a helper reference to a method
-              # that doesn't exist yet (confirmed directly -- happened twice).
-              # A single GitHub suggestion can replace any CONTIGUOUS line
-              # range with arbitrary new content, so instead of touching each
-              # method separately, select the whole span from whichever
-              # method comes first in the file through whichever comes
-              # second, keep any code in between verbatim, and replace the
-              # entire span with: new canonical body + (untouched between-
-              # code) + new duplicate body + the new helper -- all delivered
-              # as ONE suggestion, ONE click, nothing left to forget.
-              if canon_loc[0] <= dup_loc[0]:
-                  first_name, first_loc, first_new_body = canon_name, canon_loc, suggestion["newCanonicalBody"]
-                  second_name, second_loc, second_new_body = dup_name, dup_loc, suggestion["newDuplicateBody"]
-              else:
-                  first_name, first_loc, first_new_body = dup_name, dup_loc, suggestion["newDuplicateBody"]
-                  second_name, second_loc, second_new_body = canon_name, canon_loc, suggestion["newCanonicalBody"]
-
-              span_start, span_end = first_loc[0], second_loc[1]
-              covered = diff_ranges.get(filepath, [])
-
-              # The WHOLE span (not just each method's own lines) must be in
-              # the diff, since we're now proposing to replace everything
-              # from span_start to span_end in one go.
-              if not in_diff(covered, span_start, span_end):
-                  g["suggestionStatus"] = "fallback"
-                  g["suggestionFallbackReason"] = (
-                      f"{canon_name}() and {dup_name}() need to be rewritten together, "
-                      f"but the combined span (lines {span_start}-{span_end}) isn't fully "
-                      f"part of this PR's diff. Apply both changes manually."
-                  )
-                  continue
-
-              try:
-                  with open(filepath, 'r', encoding='utf-8') as f:
-                      file_lines = f.read().splitlines()
-                  # Lines strictly between the two methods, preserved as-is
-                  # (e.g. a third, unrelated method sitting between them).
-                  between_lines = file_lines[first_loc[1]:second_loc[0] - 1]
-                  between_text = ("\n".join(between_lines) + "\n\n") if between_lines else ""
-
-                  replacement = (
-                      f"{first_new_body}\n\n{between_text}{second_new_body}\n\n{suggestion['helperCode']}"
-                  )
-
-                  body = (
-                      f"**CloneGuard — Extract Method suggestion**\n\n"
-                      f"`{dup_name}()` shares {suggestion['matchedStatements']} statement(s) with "
-                      f"`{canon_name}()`. One click applies all three changes together: both "
-                      f"methods delegate to the new `{suggestion['helperName']}()`, which is "
-                      f"included in this same suggestion.\n\n"
-                      f"```suggestion\n{replacement}\n```"
-                  )
-                  comment_body = {
-                      "body": body, "commit_id": HEAD_SHA, "path": filepath,
-                      "side": "RIGHT", "line": span_end,
-                  }
-                  if span_start != span_end:
-                      comment_body["start_line"] = span_start
-                      comment_body["start_side"] = "RIGHT"
-
-                  gh_request(
-                      f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
-                      method="POST", body=comment_body
-                  )
-                  g["suggestionStatus"] = "inline"
-                  inline_posted += 1
-                  print(f"Posted single merged suggestion for {canon_name}() + {dup_name}() + helper")
-              except urllib.error.HTTPError as e:
-                  g["suggestionStatus"] = "fallback"
-                  g["suggestionFallbackReason"] = f"GitHub rejected inline placement ({e.code}); shown below instead."
-                  print(f"Inline suggestion failed for {dup_name}(): {e.code} {e.read().decode()[:200]}")
-
-          scan_result["cloneGroups"] = groups
-          scan_result["inlineSuggestionsPosted"] = inline_posted
-          with open("scan_result.json", "w") as f:
-              json.dump(scan_result, f, indent=2)
-
-          print(f"\nInline suggestions posted: {inline_posted}")
-          PYTHON
-
-
-
-      # Step 5: Post PR summary comment, embedding any fallback suggestions
-      # and referencing inline ones, then fail the check if over threshold.
+      # Step 4: Post a summary comment with a checklist of every clone
+      # group that has an available refactor. No inline suggestion
+      # comments here anymore -- checking a box and commenting /refactor
+      # triggers a SEPARATE workflow (apply-refactors.yml) that re-verifies
+      # everything against the live file right before committing, which is
+      # what actually lets it safely handle multiple, possibly-conflicting
+      # clone groups in one PR (a plain function can appear in more than
+      # one detected pair -- e.g. multiplyAll() matching BOTH
+      # multiplyAllExact() by structure AND factorialIterative() by
+      # semantics -- found directly while testing all four clone types in
+      # one file together). Posting independent suggestion comments per
+      # group couldn't detect that kind of overlap; re-checking live state
+      # at apply-time can.
       - name: Post clone report as PR comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -399,7 +198,6 @@ jobs:
           total = result.get("totalClones", 0)
           groups = result.get("cloneGroups", [])
           files_scanned = result.get("filesScanned", 0)
-          inline_posted = result.get("inlineSuggestionsPosted", 0)
 
           if total == 0:
               body = "## ✅ CloneGuard — No Clones Detected\n\n"
@@ -430,20 +228,23 @@ jobs:
 
               suggestable = [g for g in groups if g.get("suggestion", {}).get("available")]
               if suggestable:
-                  body += "\n### Refactor Suggestions\n"
-                  if inline_posted:
-                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** once per suggestion.\n\n"
-                  fallback = [g for g in suggestable if g.get("suggestionStatus") == "fallback"]
-                  for g in fallback:
+                  body += "\n### Select clones to refactor\n"
+                  body += (
+                      "Check the box(es) for the clone(s) you'd like refactored, then comment "
+                      "`/refactor` (as its own comment) to apply your selections together. Each "
+                      "checked item is re-verified against the current code right before "
+                      "anything is applied -- if two selected items turn out to touch the same "
+                      "function, only the first is applied and the rest are skipped with a note, "
+                      "rather than risking a broken file.\n\n"
+                  )
+                  for i, g in enumerate(groups, 1):
                       s = g["suggestion"]
-                      body += f"<details><summary>📋 {g['functionA']}() ↔ {g['functionB']}() — suggested refactor (copy manually)</summary>\n\n"
-                      body += f"*{g.get('suggestionFallbackReason', '')}*\n\n"
-                      if s.get("technique") == "delegation":
-                          body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n</details>\n\n"
-                      else:
-                          body += f"**{g['functionA']}():**\n```java\n{s['newCanonicalBody']}\n```\n\n"
-                          body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n\n"
-                          body += f"**New helper:**\n```java\n{s['helperCode']}\n```\n</details>\n\n"
+                      technique_label = "Method Delegation" if s.get("technique") == "delegation" else "Extract Method"
+                      body += (
+                          f"- [ ] **{i}.** `{g.get('filepath', g.get('filename', ''))}`: "
+                          f"`{g['functionA']}()` ↔ `{g['functionB']}()` — {g['cloneType']}, {technique_label}\n"
+                      )
+                  body += "\n"
 
               not_extractable = [g for g in groups if g.get("suggestion") and not g["suggestion"].get("available")]
               if not_extractable:
