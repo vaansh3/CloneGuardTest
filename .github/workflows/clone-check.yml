@@ -248,6 +248,49 @@ jobs:
                   g["suggestionFallbackReason"] = "Could not locate one or both methods' line ranges."
                   continue
 
+              # DELEGATION is a much simpler case than EXTRACT: only the
+              # duplicate's own body changes (a one-line call to canonical),
+              # canonical is never touched, and no helper method exists to
+              # forget. Only duplicate's own lines need to be in the diff.
+              if suggestion.get("technique") == "delegation":
+                  covered = diff_ranges.get(filepath, [])
+                  if not in_diff(covered, dup_loc[0], dup_loc[1]):
+                      g["suggestionStatus"] = "fallback"
+                      g["suggestionFallbackReason"] = (
+                          f"{dup_name}() (lines {dup_loc[0]}-{dup_loc[1]}) isn't part of "
+                          f"this PR's diff, so GitHub can't anchor a clickable suggestion there."
+                      )
+                      continue
+                  try:
+                      body = (
+                          f"**CloneGuard — Method Delegation suggestion**\n\n"
+                          f"`{dup_name}()` and `{canon_name}()` share the same intent but "
+                          f"different implementations (a Type 4 semantic clone) — no literal "
+                          f"code is shared, so Extract Method doesn't apply here. Since both "
+                          f"have a compatible signature, `{dup_name}()` can simply delegate "
+                          f"to `{canon_name}()` directly.\n\n"
+                          f"```suggestion\n{suggestion['newDuplicateBody']}\n```"
+                      )
+                      comment_body = {
+                          "body": body, "commit_id": HEAD_SHA, "path": filepath,
+                          "side": "RIGHT", "line": dup_loc[1],
+                      }
+                      if dup_loc[0] != dup_loc[1]:
+                          comment_body["start_line"] = dup_loc[0]
+                          comment_body["start_side"] = "RIGHT"
+                      gh_request(
+                          f"https://api.github.com/repos/{REPO}/pulls/{PR_NUMBER}/comments",
+                          method="POST", body=comment_body
+                      )
+                      g["suggestionStatus"] = "inline"
+                      inline_posted += 1
+                      print(f"Posted delegation suggestion for {dup_name}() -> {canon_name}()")
+                  except urllib.error.HTTPError as e:
+                      g["suggestionStatus"] = "fallback"
+                      g["suggestionFallbackReason"] = f"GitHub rejected inline placement ({e.code}); shown below instead."
+                      print(f"Delegation suggestion failed for {dup_name}(): {e.code} {e.read().decode()[:200]}")
+                  continue
+
               # ONE-CLICK FIX: originally posted 3 separate comments (canonical
               # suggestion, duplicate suggestion, a plain-text helper note the
               # person had to paste in by hand) -- found live that this is a
@@ -389,15 +432,18 @@ jobs:
               if suggestable:
                   body += "\n### Refactor Suggestions\n"
                   if inline_posted:
-                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** once per suggestion; canonical, duplicate, and the new helper are all applied together in that single click.\n\n"
+                      body += f"✨ {inline_posted} refactor(s) posted as inline review comments above — click **Commit suggestion** once per suggestion.\n\n"
                   fallback = [g for g in suggestable if g.get("suggestionStatus") == "fallback"]
                   for g in fallback:
                       s = g["suggestion"]
                       body += f"<details><summary>📋 {g['functionA']}() ↔ {g['functionB']}() — suggested refactor (copy manually)</summary>\n\n"
                       body += f"*{g.get('suggestionFallbackReason', '')}*\n\n"
-                      body += f"**{g['functionA']}():**\n```java\n{s['newCanonicalBody']}\n```\n\n"
-                      body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n\n"
-                      body += f"**New helper:**\n```java\n{s['helperCode']}\n```\n</details>\n\n"
+                      if s.get("technique") == "delegation":
+                          body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n</details>\n\n"
+                      else:
+                          body += f"**{g['functionA']}():**\n```java\n{s['newCanonicalBody']}\n```\n\n"
+                          body += f"**{g['functionB']}():**\n```java\n{s['newDuplicateBody']}\n```\n\n"
+                          body += f"**New helper:**\n```java\n{s['helperCode']}\n```\n</details>\n\n"
 
               not_extractable = [g for g in groups if g.get("suggestion") and not g["suggestion"].get("available")]
               if not_extractable:
