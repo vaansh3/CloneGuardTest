@@ -9,55 +9,55 @@ public class Main {
     }
 
     public int sumTotal(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
-            total += arr[i];
-        }
-        return total;
-    }
+    return coreSumTotalExact(arr);
+}
 
     public int sumTotalExact(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
+    return coreSumTotalExact(arr);
+}
+
+private static int coreSumTotalExact(int[] arr) {
+    int total = 0;
+    for (int i = 0; i < arr.length; i++) {
             total += arr[i];
         }
-        return total;
-    }
+    return total;
+}
 
     public int countEvens(int[] nums) {
-        int count = 0;
-        for (int i = 0; i < nums.length; i++) {
-            if (nums[i] % 2 == 0) count++;
-        }
-        return count;
-    }
+    return coreCountEvenValues(nums);
+}
 
     public int countEvenValues(int[] values) {
-        int result = 0;
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] % 2 == 0) result++;
+    return coreCountEvenValues(values);
+}
+
+private static int coreCountEvenValues(int[] nums) {
+    int count = 0;
+    for (int i = 0; i < nums.length; i++) {
+            if (nums[i] % 2 == 0) count++;
         }
-        return result;
-    }
+    return count;
+}
 
     public int minValue(int[] arr) {
-        int min = arr[0];
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i] < min) min = arr[i];
-        }
-        return min;
-    }
+    return coreMinValueSafe(arr);
+}
 
     public int minValueSafe(int[] arr) {
-        if (arr == null || arr.length == 0) {
+    if (arr == null || arr.length == 0) {
             return -1;
         }
-        int min = arr[0];
-        for (int i = 0; i < arr.length; i++) {
+    return coreMinValueSafe(arr);
+}
+
+private static int coreMinValueSafe(int[] arr) {
+    int min = arr[0];
+    for (int i = 0; i < arr.length; i++) {
             if (arr[i] < min) min = arr[i];
         }
-        return min;
-    }
+    return min;
+}
 
     public int fibIterative(int n) {
         int a = 0, b = 1;
