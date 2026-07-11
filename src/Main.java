@@ -9,55 +9,55 @@ public class Main {
     }
 
     public int arraySum(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
-            total += arr[i];
-        }
-        return total;
-    }
+    return coreArraySumExact(arr);
+}
 
     public int arraySumExact(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
+    return coreArraySumExact(arr);
+}
+
+private static int coreArraySumExact(int[] arr) {
+    int total = 0;
+    for (int i = 0; i < arr.length; i++) {
             total += arr[i];
         }
-        return total;
-    }
+    return total;
+}
 
     public int countPositives(int[] nums) {
-        int count = 0;
-        for (int i = 0; i < nums.length; i++) {
-            if (nums[i] > 0) count++;
-        }
-        return count;
-    }
+    return coreCountPositiveValues(nums);
+}
 
     public int countPositiveValues(int[] values) {
-        int result = 0;
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] > 0) result++;
+    return coreCountPositiveValues(values);
+}
+
+private static int coreCountPositiveValues(int[] nums) {
+    int count = 0;
+    for (int i = 0; i < nums.length; i++) {
+            if (nums[i] > 0) count++;
         }
-        return result;
-    }
+    return count;
+}
 
     public int findMin(int[] arr) {
-        int min = arr[0];
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i] < min) min = arr[i];
-        }
-        return min;
-    }
+    return coreFindMinSafe(arr);
+}
 
     public int findMinSafe(int[] arr) {
-        if (arr == null || arr.length == 0) {
+    if (arr == null || arr.length == 0) {
             return -1;
         }
-        int min = arr[0];
-        for (int i = 0; i < arr.length; i++) {
+    return coreFindMinSafe(arr);
+}
+
+private static int coreFindMinSafe(int[] arr) {
+    int min = arr[0];
+    for (int i = 0; i < arr.length; i++) {
             if (arr[i] < min) min = arr[i];
         }
-        return min;
-    }
+    return min;
+}
 
     public int gcdIterative(int a, int b) {
         while (b != 0) {
@@ -69,9 +69,6 @@ public class Main {
     }
 
     public int gcdRecursive(int a, int b) {
-        if (b == 0) {
-            return a;
-        }
-        return gcdRecursive(b, a % b);
-    }
+    return gcdIterative(a, b);
+}
 }
