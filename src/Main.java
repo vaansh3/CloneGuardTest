@@ -8,19 +8,70 @@ public class Main {
         return totalSum;
     }
 
-    public static int findMax(int[] numbers) {
-        int max = numbers[0];
-        for (int n : numbers) {
-            if (n > max) max = n;
+    public int arraySum(int[] arr) {
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            total += arr[i];
         }
-        return max;
+        return total;
     }
 
-    public static boolean isPrime(int number) {
-        if (number < 2) return false;
-        for (int i = 2; i <= Math.sqrt(number); i++) {
-            if (number % i == 0) return false;
+    public int arraySumExact(int[] arr) {
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            total += arr[i];
         }
-        return true;
+        return total;
+    }
+
+    public int countPositives(int[] nums) {
+        int count = 0;
+        for (int i = 0; i < nums.length; i++) {
+            if (nums[i] > 0) count++;
+        }
+        return count;
+    }
+
+    public int countPositiveValues(int[] values) {
+        int result = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] > 0) result++;
+        }
+        return result;
+    }
+
+    public int findMin(int[] arr) {
+        int min = arr[0];
+        for (int i = 0; i < arr.length; i++) {
+            if (arr[i] < min) min = arr[i];
+        }
+        return min;
+    }
+
+    public int findMinSafe(int[] arr) {
+        if (arr == null || arr.length == 0) {
+            return -1;
+        }
+        int min = arr[0];
+        for (int i = 0; i < arr.length; i++) {
+            if (arr[i] < min) min = arr[i];
+        }
+        return min;
+    }
+
+    public int gcdIterative(int a, int b) {
+        while (b != 0) {
+            int temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+
+    public int gcdRecursive(int a, int b) {
+        if (b == 0) {
+            return a;
+        }
+        return gcdRecursive(b, a % b);
     }
 }
