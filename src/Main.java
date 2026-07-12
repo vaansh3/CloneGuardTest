@@ -8,19 +8,62 @@ public class Main {
         return totalSum;
     }
 
-    public static int findMax(int[] numbers) {
-        int max = numbers[0];
-        for (int n : numbers) {
-            if (n > max) max = n;
+    public int listTotal(int[] arr) {
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            total += arr[i];
         }
-        return max;
+        return total;
     }
 
-    public static boolean isPrime(int number) {
-        if (number < 2) return false;
-        for (int i = 2; i <= Math.sqrt(number); i++) {
-            if (number % i == 0) return false;
+    public int listTotalExact(int[] arr) {
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            total += arr[i];
         }
-        return true;
+        return total;
+    }
+
+    public int countNegatives(int[] nums) {
+        int count = 0;
+        for (int i = 0; i < nums.length; i++) {
+            if (nums[i] < 0) count++;
+        }
+        return count;
+    }
+
+    public int countNegativeValues(int[] values) {
+        int result = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] < 0) result++;
+        }
+        return result;
+    }
+
+    public int lastElement(int[] arr) {
+        return arr[arr.length - 1];
+    }
+
+    public int lastElementSafe(int[] arr) {
+        if (arr == null || arr.length == 0) {
+            return -1;
+        }
+        return arr[arr.length - 1];
+    }
+
+    public int sumDigitsIterative(int n) {
+        int sum = 0;
+        while (n > 0) {
+            sum += n % 10;
+            n /= 10;
+        }
+        return sum;
+    }
+
+    public int sumDigitsRecursive(int n) {
+        if (n == 0) {
+            return 0;
+        }
+        return (n % 10) + sumDigitsRecursive(n / 10);
     }
 }
