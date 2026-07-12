@@ -9,36 +9,36 @@ public class Main {
     }
 
     public int listTotal(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
-            total += arr[i];
-        }
-        return total;
-    }
+    return coreListTotalExact(arr);
+}
 
     public int listTotalExact(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
+    return coreListTotalExact(arr);
+}
+
+private static int coreListTotalExact(int[] arr) {
+    int total = 0;
+    for (int i = 0; i < arr.length; i++) {
             total += arr[i];
         }
-        return total;
-    }
+    return total;
+}
 
     public int countNegatives(int[] nums) {
-        int count = 0;
-        for (int i = 0; i < nums.length; i++) {
-            if (nums[i] < 0) count++;
-        }
-        return count;
-    }
+    return coreCountNegativeValues(nums);
+}
 
     public int countNegativeValues(int[] values) {
-        int result = 0;
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] < 0) result++;
+    return coreCountNegativeValues(values);
+}
+
+private static int coreCountNegativeValues(int[] nums) {
+    int count = 0;
+    for (int i = 0; i < nums.length; i++) {
+            if (nums[i] < 0) count++;
         }
-        return result;
-    }
+    return count;
+}
 
     public int lastElement(int[] arr) {
         return arr[arr.length - 1];
@@ -61,9 +61,6 @@ public class Main {
     }
 
     public int sumDigitsRecursive(int n) {
-        if (n == 0) {
-            return 0;
-        }
-        return (n % 10) + sumDigitsRecursive(n / 10);
-    }
+    return sumDigitsIterative(n);
+}
 }
