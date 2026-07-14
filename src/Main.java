@@ -9,36 +9,36 @@ public class Main {
     }
 
     public int totalScore(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
-            total += arr[i];
-        }
-        return total;
-    }
+    return coreTotalScoreExact(arr);
+}
 
     public int totalScoreExact(int[] arr) {
-        int total = 0;
-        for (int i = 0; i < arr.length; i++) {
+    return coreTotalScoreExact(arr);
+}
+
+private static int coreTotalScoreExact(int[] arr) {
+    int total = 0;
+    for (int i = 0; i < arr.length; i++) {
             total += arr[i];
         }
-        return total;
-    }
+    return total;
+}
 
     public int countZeros(int[] nums) {
-        int count = 0;
-        for (int i = 0; i < nums.length; i++) {
-            if (nums[i] == 0) count++;
-        }
-        return count;
-    }
+    return coreCountZeroValues(nums);
+}
 
     public int countZeroValues(int[] values) {
-        int result = 0;
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] == 0) result++;
+    return coreCountZeroValues(values);
+}
+
+private static int coreCountZeroValues(int[] nums) {
+    int count = 0;
+    for (int i = 0; i < nums.length; i++) {
+            if (nums[i] == 0) count++;
         }
-        return result;
-    }
+    return count;
+}
 
     public int firstElement(int[] arr) {
         return arr[0];
@@ -64,9 +64,6 @@ public class Main {
     }
 
     public int countDigitsRecursive(int n) {
-        if (n < 10) {
-            return 1;
-        }
-        return 1 + countDigitsRecursive(n / 10);
-    }
+    return countDigitsIterative(n);
+}
 }
