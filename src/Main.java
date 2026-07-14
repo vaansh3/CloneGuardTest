@@ -9,39 +9,39 @@ public class Main {
     }
 
     public int averageValue(int[] arr) {
-        int sum = 0;
-        for (int i = 0; i < arr.length; i++) {
-            sum += arr[i];
-        }
-        return sum / arr.length;
-    }
+    return coreAverageValueSafe(arr);
+}
 
     public int averageValueSafe(int[] arr) {
-        if (arr == null || arr.length == 0) {
+    if (arr == null || arr.length == 0) {
             return -1;
         }
-        int sum = 0;
-        for (int i = 0; i < arr.length; i++) {
+    return coreAverageValueSafe(arr);
+}
+
+private static int coreAverageValueSafe(int[] arr) {
+    int sum = 0;
+    for (int i = 0; i < arr.length; i++) {
             sum += arr[i];
         }
-        return sum / arr.length;
-    }
+    return sum / arr.length;
+}
 
     public int countNegatives(int[] nums) {
-        int count = 0;
-        for (int i = 0; i < nums.length; i++) {
-            if (nums[i] < 0) count++;
-        }
-        return count;
-    }
+    return coreCountNegativeValues(nums);
+}
 
     public int countNegativeValues(int[] values) {
-        int result = 0;
-        for (int j = 0; j < values.length; j++) {
-            if (values[j] < 0) result++;
+    return coreCountNegativeValues(values);
+}
+
+private static int coreCountNegativeValues(int[] nums) {
+    int count = 0;
+    for (int i = 0; i < nums.length; i++) {
+            if (nums[i] < 0) count++;
         }
-        return result;
-    }
+    return count;
+}
 
     public int gcdIterative(int a, int b) {
         while (b != 0) {
@@ -53,7 +53,6 @@ public class Main {
     }
 
     public int gcdRecursive(int a, int b) {
-        if (b == 0) return a;
-        return gcdRecursive(b, a % b);
-    }
+    return gcdIterative(a, b);
+}
 }
