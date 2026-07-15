@@ -1,26 +1,18 @@
 public class Main {
 
-    public static int calculateSum(int[] numbers) {
-        int totalSum = 0;
-        for (int number : numbers) {
-            totalSum += number;
+    public int sumValues(int[] arr) {
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            total += arr[i];
         }
-        return totalSum;
+        return total;
     }
 
-    public static int findMax(int[] numbers) {
-        int max = numbers[0];
-        for (int n : numbers) {
-            if (n > max) max = n;
+    public int sumValuesExact(int[] arr) {
+        int total = 0;
+        for (int i = 0; i < arr.length; i++) {
+            total += arr[i];
         }
-        return max;
-    }
-
-    public static boolean isPrime(int number) {
-        if (number < 2) return false;
-        for (int i = 2; i <= Math.sqrt(number); i++) {
-            if (number % i == 0) return false;
-        }
-        return true;
+        return total;
     }
 }
